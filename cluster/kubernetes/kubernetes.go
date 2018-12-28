@@ -281,11 +281,18 @@ func (c *Cluster) Export() ([]byte, error) {
 		for _, resourceKind := range resourceKinds {
 			podControllers, err := resourceKind.getPodControllers(c, ns.Name)
 			if err != nil {
-				if se, ok := err.(*apierrors.StatusError); ok && se.ErrStatus.Reason == meta_v1.StatusReasonNotFound {
-					// Kind not supported by API server, skip
-					continue
-				} else {
-					return nil, err
+				if se, ok := err.(*apierrors.StatusError); ok {
+					switch (se.ErrStatus.Reason) {
+							case meta_v1.StatusReasonNotFound:
+									// Kind not supported by API server, skip
+									continue
+							case meta_v1.StatusReasonForbidden:
+                                    // K8s can return forbidden instead of not found for non super admins
+									c.logger.Log("warning", "not allowed to list resources", "err", err)
+									continue
+							default:
+									return nil, err
+					}
 				}
 			}
 
